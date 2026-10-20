@@ -296,6 +296,7 @@
 		3402AAB1271D9E180084CBAE /* OWSNavigationBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A95544271B510400B05242 /* OWSNavigationBar.swift */; };
 		3402AAB2271D9E180084CBAE /* ContactTableViewCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A95536271B510400B05242 /* ContactTableViewCell.swift */; };
 		3402AAB3271D9E180084CBAE /* CVTextLabel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A95522271B510400B05242 /* CVTextLabel.swift */; };
+		5ECA11E62D1A000000000001 /* CVTextTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECA11E52D1A000000000001 /* CVTextTest.swift */; };
 		3402AAB4271D9E180084CBAE /* VideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A95519271B510400B05242 /* VideoPlayerView.swift */; };
 		3402AAB6271D9E180084CBAE /* ImageEditorCropViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A95556271B510400B05242 /* ImageEditorCropViewController.swift */; };
 		3405C06E25435048008B24EF /* ConversationViewController+Banners.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3405C06D25435048008B24EF /* ConversationViewController+Banners.swift */; };
@@ -4838,6 +4839,7 @@
 		34A95523271B510400B05242 /* CVCellMeasurement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVCellMeasurement.swift; sourceTree = "<group>"; };
 		34A95524271B510400B05242 /* CVUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVUtils.swift; sourceTree = "<group>"; };
 		34A95525271B510400B05242 /* CVText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVText.swift; sourceTree = "<group>"; };
+		5ECA11E52D1A000000000001 /* CVTextTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CVTextTest.swift; sourceTree = "<group>"; };
 		34A95526271B510400B05242 /* DirectionalPanGestureRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionalPanGestureRecognizer.swift; sourceTree = "<group>"; };
 		34A95529271B510400B05242 /* LinkingTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkingTextView.swift; sourceTree = "<group>"; };
 		34A9552C271B510400B05242 /* MentionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MentionPicker.swift; sourceTree = "<group>"; };
@@ -9665,6 +9667,7 @@
 				764981442A23194F00EC1287 /* CVItemViewModel.swift */,
 				34A95525271B510400B05242 /* CVText.swift */,
 				34A95522271B510400B05242 /* CVTextLabel.swift */,
+				5ECA11E52D1A000000000001 /* CVTextTest.swift */,
 				34A95524271B510400B05242 /* CVUtils.swift */,
 			);
 			path = ConversationView;
@@ -18780,6 +18783,7 @@
 				63C24D53306C50FD00D4C167 /* ContactShareAvatarFieldTests.swift in Sources */,
 				A20EC336FE7D969EBAA7B99E /* ContactSharingPickerViewModelTests.swift in Sources */,
 				848961B553640CEDA15C38D9 /* ContactSharingSystemContactWrapperTests.swift in Sources */,
+				5ECA11E62D1A000000000001 /* CVTextTest.swift in Sources */,
 				50BF51082BB2030C00C2C309 /* FormattedNumberFieldTest.swift in Sources */,
 				509085BA2C498C4400409B85 /* HTMLMetadataTests.swift in Sources */,
 				5073EACB2C4F3A16001FBB3E /* LinkPreviewFetcherTest.swift in Sources */,

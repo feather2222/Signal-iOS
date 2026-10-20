@@ -325,8 +325,7 @@ public class CVText {
         return result.ceil
     }
 
-#if TESTABLE_BUILD
-    public static func measureLabelUsingView(config: CVLabelConfig, maxWidth: CGFloat) -> CGSize {
+    private static func measureLabelUsingView(config: CVLabelConfig, maxWidth: CGFloat) -> CGSize {
         guard !config.text.isEmpty else {
             return .zero
         }
@@ -337,7 +336,6 @@ public class CVText {
         size.width = min(size.width, maxWidth)
         return size
     }
-#endif
 
     static func measureLabelUsingLayoutManager(config: CVLabelConfig, maxWidth: CGFloat) -> CGSize {
         guard !config.text.isEmpty else {
@@ -347,7 +345,17 @@ public class CVText {
         textContainer.maximumNumberOfLines = config.numberOfLines
         textContainer.lineBreakMode = config.lineBreakMode
         textContainer.lineFragmentPadding = 0
-        return textContainer.size(for: config.text, font: config.font)
+        let result = textContainer.size(for: config.text, font: config.font)
+
+        // On some iOS versions, `usedRect(for:)` can fail to wrap long text
+        // and return a width larger than the container's, which would let the
+        // content stretch beyond its maximum width. Fall back to measuring
+        // with a UILabel, which wraps correctly.
+        guard result.width <= maxWidth else {
+            owsAssertDebug(false, "Layout manager measurement exceeded maxWidth.")
+            return measureLabelUsingView(config: config, maxWidth: maxWidth)
+        }
+        return result
     }
 
     // MARK: - CVTextLabel
