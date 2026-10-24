@@ -286,4 +286,68 @@ extension FullTextSearchIndexer {
             owsFailDebug("Couldn't fetch results: \(error.grdbErrorForLogging)")
         }
     }
+
+    /// A fallback substring search over the indexed message content.
+    ///
+    /// FTS only supports prefix-token matches, so searches like "12345"
+    /// (matching the mid-token text in "abc12345") or "ffects" (matching
+    /// "effects") return no results even though the text is present. The
+    /// in-conversation search highlighting performs substring matching, so
+    /// this fallback keeps the result set consistent with what the user sees
+    /// highlighted.
+    public static func substringSearch(
+        for searchText: String,
+        maxResults: Int,
+        tx: DBReadTransaction,
+        block: (_ message: TSMessage, _ stop: inout Bool) -> Void,
+    ) {
+        let searchTerms = normalizeText(searchText)
+            .split(separator: " ")
+            .map(String.init)
+        guard !searchTerms.isEmpty else {
+            return
+        }
+
+        // Escape LIKE wildcards and the escape character itself.
+        func escapeLikePattern(_ term: String) -> String {
+            var result = term.replacingOccurrences(of: "\\", with: "\\\\")
+            result = result.replacingOccurrences(of: "%", with: "\\%")
+            result = result.replacingOccurrences(of: "_", with: "\\_")
+            return result
+        }
+
+        // Match every term (AND semantics, consistent with the FTS query).
+        var sql = """
+        SELECT \(uniqueIdColumn)
+        FROM \(contentTableName)
+        WHERE \(collectionColumn) = ?
+        """
+        var arguments: [any DatabaseValueConvertible] = [legacyCollectionName]
+        for term in searchTerms {
+            sql += " AND \(ftsContentColumn) LIKE ? ESCAPE '\\'"
+            arguments.append("%" + escapeLikePattern(term) + "%")
+        }
+        sql += " ORDER BY rowId DESC LIMIT \(maxResults)"
+
+        do {
+            let cursor = try Row.fetchCursor(tx.database, sql: sql, arguments: StatementArguments(arguments))
+            while let row = try cursor.next() {
+                guard let uniqueId = (row[uniqueIdColumn] as String).nilIfEmpty else {
+                    owsFailDebug("Found a message with a uniqueId in the FTS table")
+                    continue
+                }
+                guard let message = TSMessage.fetchMessageViaCache(uniqueId: uniqueId, transaction: tx) else {
+                    owsFailDebug("Couldn't find message that exists in the FTS table")
+                    continue
+                }
+                var stop = false
+                block(message, &stop)
+                if stop {
+                    break
+                }
+            }
+        } catch {
+            owsFailDebug("Couldn't fetch substring search results: \(error.grdbErrorForLogging)")
+        }
+    }
 }

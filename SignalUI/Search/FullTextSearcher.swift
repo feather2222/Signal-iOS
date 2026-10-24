@@ -671,6 +671,26 @@ public class FullTextSearcher {
             }
         }
 
+        // FTS only supports prefix-token matching, so it misses mid-token
+        // substrings (e.g. searching "12345" won't match "abc12345") even
+        // though the in-conversation highlighting does match them. Fall back
+        // to a substring search so the result set isn't empty in those cases.
+        if messages.isEmpty {
+            FullTextSearchIndexer.substringSearch(
+                for: searchText,
+                maxResults: maxResults,
+                tx: transaction,
+            ) { message, stop in
+                guard messages.count < maxResults else {
+                    stop = true
+                    return
+                }
+                if message.uniqueThreadId == threadUniqueId {
+                    appendMessage(message)
+                }
+            }
+        }
+
         let canSearchForMentions: Bool = isGroupThread
         if canSearchForMentions {
             let tsAccountManager = DependenciesBridge.shared.tsAccountManager
