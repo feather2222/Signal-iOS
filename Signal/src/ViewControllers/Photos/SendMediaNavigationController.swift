@@ -114,6 +114,12 @@ class SendMediaNavigationController: OWSNavigationController, AttachmentApproval
 
     fileprivate var nativePickerToPresent: PHPickerViewController?
 
+    /// Asset identifiers most recently passed as `preselectedAssetIdentifiers`
+    /// when presenting the "add more" picker from the approval screen.
+    ///
+    /// Empty whenever the picker was presented for an initial selection.
+    private var additionalPickerPreselectedAssetIdentifiers: [String] = []
+
     private static func phPickerConfiguration(cameraAttachmentCount: Int) -> PHPickerConfiguration {
         var config = PHPickerConfiguration(photoLibrary: .shared())
         config.preferredAssetRepresentationMode = .current
@@ -491,7 +497,89 @@ class SendMediaNavigationController: OWSNavigationController, AttachmentApproval
         )
     }
 
+    /// Keep all existing `pendingAttachments` and append only newly-selected
+    /// `results`, preserving the order and any edits of the existing
+    /// attachments.
+    ///
+    /// Used to work around an iOS 26 regression where PHPickerViewController
+    /// ignores `preselectedAssetIdentifiers`, in which case `results` contains
+    /// only the newly-picked items.
+    private func loadAdditionalPHPickerResults(_ results: [PHPickerResult]) -> PHPickerResultsLoadResult {
+        var existingAssetIdentifiers = Set(self.pendingAttachments.compactMap { pendingAttachment -> String? in
+            switch pendingAttachment.source {
+            case .camera:
+                return nil
+            case .systemLibrary(let systemIdentifier):
+                return systemIdentifier
+            }
+        })
+
+        var resolvablePendingAttachments = self.pendingAttachments.map { pendingAttachment in
+            return { return pendingAttachment } as (() async throws -> PendingAttachment)
+        }
+
+        let maxAttachments = MessageBodyAttachmentLimits.maxAllowedVisualMedia
+        var didAddAttachments = false
+        for result in results {
+            guard resolvablePendingAttachments.count < maxAttachments else { break }
+            guard let assetIdentifier = result.assetIdentifier else {
+                owsFailDebug("can't select asset without an identifier")
+                continue
+            }
+            guard existingAssetIdentifiers.insert(assetIdentifier).inserted else { continue }
+            didAddAttachments = true
+            resolvablePendingAttachments.append({ [attachmentLimits] in
+                let attachment = try await TypedItemProvider.buildVisualMediaAttachment(
+                    forItemProvider: result.itemProvider,
+                    attachmentLimits: attachmentLimits,
+                )
+                let approvalItem = AttachmentApprovalItem(attachment: attachment, canSave: false)
+                return PendingAttachment(source: .systemLibrary(systemIdentifier: assetIdentifier), approvalItem: approvalItem)
+            })
+        }
+
+        return PHPickerResultsLoadResult(
+            resolvablePendingAttachments: resolvablePendingAttachments,
+            didAddAttachments: didAddAttachments,
+        )
+    }
+
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        let additionalPickerPreselected = self.additionalPickerPreselectedAssetIdentifiers
+        self.additionalPickerPreselectedAssetIdentifiers = []
+
+        if !additionalPickerPreselected.isEmpty {
+            // The picker was presented from the approval screen via "add more".
+
+            // Tapping cancel should keep the current attachments and return
+            // to the approval screen, not abandon the whole flow.
+            guard !results.isEmpty else {
+                picker.dismiss(animated: true)
+                return
+            }
+
+            let resultAssetIdentifiers = Set(results.compactMap(\.assetIdentifier))
+            let preselectionWasIgnored = !additionalPickerPreselected.contains(where: {
+                resultAssetIdentifiers.contains($0)
+            })
+            if preselectionWasIgnored {
+                // iOS 26 regression: PHPickerViewController ignores
+                // `preselectedAssetIdentifiers`, so `results` only contains
+                // the newly-picked items. Merge them with the existing
+                // attachments instead of replacing them.
+                //
+                // Note: as a side effect, deselecting every previously-added
+                // photo inside the picker won't remove them; they can still
+                // be removed from the approval screen.
+                let loadResult = loadAdditionalPHPickerResults(results)
+                showApprovalAfterProcessing(
+                    resolvablePendingAttachments: loadResult.resolvablePendingAttachments,
+                    pickerViewController: picker,
+                )
+                return
+            }
+        }
+
         let loadResult = if
             self.pendingAttachments.contains(where: {
                 return if case .camera = $0.source { true } else { false }
@@ -626,12 +714,14 @@ class SendMediaNavigationController: OWSNavigationController, AttachmentApproval
                 }
             }),
         )
-        config.preselectedAssetIdentifiers = self.pendingAttachments.compactMap({
+        let preselectedAssetIdentifiers: [String] = self.pendingAttachments.compactMap({
             switch $0.source {
             case .camera: nil
             case .systemLibrary(let systemIdentifier): systemIdentifier
             }
         })
+        config.preselectedAssetIdentifiers = preselectedAssetIdentifiers
+        self.additionalPickerPreselectedAssetIdentifiers = preselectedAssetIdentifiers
 
         let vc = PHPickerViewController(configuration: config)
         vc.delegate = self
