@@ -400,6 +400,12 @@ class MediaCaptionToolbar: UIView, UITextViewDelegate, BodyRangesTextViewDelegat
         // |[ Stretching text view] [View Once Button]|
         // If `viewOnceButton` is made hidden text views will occupy all the horizontal space automatically.
         viewOnceButton.setContentHuggingHorizontalHigh()
+        // Give the button an explicit width: without it, the horizontal
+        // layout of the stack view is ambiguous and Auto Layout may resolve
+        // it by giving the button a zero width, making it invisible. (#6336)
+        viewOnceButton.widthAnchor.constraint(
+            equalToConstant: LayoutMetrics.initialTextBoxHeight,
+        ).isActive = true
         let horizontalStack = UIStackView(arrangedSubviews: [textViewWrapper, viewOnceButton])
         // No spacing required as both text view and `viewOnceButton` have some padding embedded.
         horizontalStack.spacing = 0
