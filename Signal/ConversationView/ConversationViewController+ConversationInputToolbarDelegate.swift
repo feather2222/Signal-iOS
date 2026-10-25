@@ -915,21 +915,64 @@ extension ConversationViewController: SendMediaNavDelegate {
         didApproveAttachments approvedAttachments: ApprovedAttachments,
         messageBody: MessageBody?,
     ) {
-        ModalActivityIndicatorViewController.present(
-            fromViewController: sendMediaNavigationController,
-            title: CommonStrings.preparingModal,
-            asyncBlock: { modal in
-                await self.sendAttachments(
-                    approvedAttachments,
-                    messageBody: messageBody,
-                    from: sendMediaNavigationController,
-                    attachmentLimits: sendMediaNavigationController.attachmentLimits,
-                )
-                modal.dismiss(completion: {
-                    self.dismiss(animated: true)
-                })
-            },
+        Task { @MainActor in
+            let shouldDismiss = await self.sendAttachmentsWithPreparingModal(
+                approvedAttachments,
+                messageBody: messageBody,
+                from: sendMediaNavigationController,
+                attachmentLimits: sendMediaNavigationController.attachmentLimits,
+            )
+            if shouldDismiss {
+                self.dismiss(animated: true)
+            }
+        }
+    }
+
+    /// Sends approved attachments, confirming any changed safety numbers
+    /// first and then showing a "preparing" modal while the send is
+    /// prepared.
+    ///
+    /// The safety number confirmation must happen *before* the modal is
+    /// presented: the modal occupies presentation on `viewController`, which
+    /// would prevent the confirmation sheet from ever appearing and leave
+    /// the send spinning indefinitely. (#6324)
+    ///
+    /// - Returns: `true` once the send flow is done (the caller should
+    ///   dismiss the media flow); `false` if the user declined the safety
+    ///   number confirmation and the media flow should stay open.
+    @MainActor
+    @discardableResult
+    func sendAttachmentsWithPreparingModal(
+        _ approvedAttachments: ApprovedAttachments,
+        messageBody: MessageBody?,
+        from viewController: UIViewController,
+        attachmentLimits: OutgoingAttachmentLimits,
+    ) async -> Bool {
+        let identityIsConfirmed = await self.showSafetyNumberConfirmationIfNecessary(
+            from: viewController,
+            confirmationText: SafetyNumberStrings.confirmSendButton,
+            untrustedThreshold: Date(),
         )
+        guard identityIsConfirmed else { return false }
+
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            ModalActivityIndicatorViewController.present(
+                fromViewController: viewController,
+                title: CommonStrings.preparingModal,
+                asyncBlock: { modal in
+                    await self.sendAttachments(
+                        approvedAttachments,
+                        messageBody: messageBody,
+                        from: viewController,
+                        attachmentLimits: attachmentLimits,
+                    )
+                    modal.dismiss(completion: {
+                        continuation.resume()
+                    })
+                },
+            )
+        }
+        return true
     }
 
     /// Attempts to send attachments. Handles prompting to unblock or un-verify safety numbers, as well as showing failure states.
